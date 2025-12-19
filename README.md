@@ -1,0 +1,125 @@
+# Easy Animate - AI教学动画生成器
+
+一款基于AI的教学演示动画智能助手，让零基础用户通过文字描述一键生成高质量SVG动画。
+
+## 功能特性
+
+- 🎨 **一键生成** - 输入描述，AI自动生成教学动画
+- ✏️ **编辑修改** - 支持对生成的动画进行调整
+- 📤 **视频导出** - 支持SVG/MP4格式导出
+- 👥 **社区分享** - 发布作品，点赞收藏，复用他人创意
+- 🔐 **用户系统** - 注册登录，配额管理
+- ⚙️ **后台管理** - 用户管理，内容审核
+
+## 技术栈
+
+- **前端**: React + Vite + TailwindCSS
+- **后端**: Flask + SQLAlchemy
+- **数据库**: SQLite
+- **AI**: Claude Haiku (yunwu.ai)
+
+## 快速开始
+
+### 1. 后端启动
+
+```bash
+cd backend
+
+# 创建虚拟环境
+python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 配置环境变量
+copy .env.example .env
+# 编辑 .env 文件，填入你的 Claude API Key
+
+# 启动服务
+python app.py
+```
+
+### 2. 前端启动
+
+```bash
+cd frontend
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
+npm run dev
+```
+
+### 3. 访问应用
+
+- 前端: http://localhost:5173
+- 后端API: http://localhost:5000
+
+### 默认管理员账户
+
+- 用户名: admin
+- 密码: admin123
+
+## 项目结构
+
+```
+├── backend/
+│   ├── app.py              # Flask应用入口
+│   ├── config.py           # 配置文件
+│   ├── models.py           # 数据模型
+│   ├── routes/             # API路由
+│   │   ├── auth.py         # 认证相关
+│   │   ├── animations.py   # 动画管理
+│   │   ├── community.py    # 社区功能
+│   │   └── admin.py        # 后台管理
+│   ├── services/
+│   │   └── ai_service.py   # AI服务
+│   └── db/                 # 数据库文件夹
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # 组件
+│   │   ├── pages/          # 页面
+│   │   ├── store/          # 状态管理
+│   │   └── services/       # API服务
+│   └── ...
+└── README.md
+```
+
+## 环境变量
+
+在 `backend/.env` 中配置:
+
+```
+SECRET_KEY=your-secret-key
+JWT_SECRET_KEY=your-jwt-secret
+CLAUDE_API_KEY=your-claude-api-key
+CLAUDE_API_BASE_URL=https://yunwu.ai/v1
+CLAUDE_MODEL=claude-haiku-4-5-20251001
+```
+
+### API 配置说明
+
+- **CLAUDE_API_KEY**: 从 yunwu.ai 获取的 API 密钥
+- **CLAUDE_API_BASE_URL**: Claude API 的基础 URL（默认为 yunwu.ai）
+- **CLAUDE_MODEL**: 使用的模型名称（默认为 claude-haiku-4-5-20251001）
+
+## 部署
+
+### 生产环境构建
+
+```bash
+# 前端构建
+cd frontend
+npm run build
+
+# 后端使用gunicorn
+cd backend
+gunicorn -w 4 -b 0.0.0.0:5000 app:app
+```
+
+## License
+
+MIT
