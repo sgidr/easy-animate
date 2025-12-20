@@ -93,25 +93,25 @@ function Profile() {
   ]
 
   return (
-    <div className="py-12 px-4">
+    <div className="py-8 sm:py-12 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Profile Header */}
-        <div className="glow-border p-8 mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center border border-primary/30 pulse-glow">
-                <User className="w-10 h-10 text-accent" />
+        <div className="glow-border p-4 sm:p-6 lg:p-8 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="w-14 h-14 sm:w-20 sm:h-20 bg-gradient-to-br from-primary/20 to-accent/20 rounded-full flex items-center justify-center border border-primary/30 pulse-glow flex-shrink-0">
+                <User className="w-7 h-7 sm:w-10 sm:h-10 text-accent" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">{user?.username}</h1>
-                <p className="text-slate-400">{user?.email}</p>
-                <div className="flex items-center gap-4 mt-2 text-sm">
+                <h1 className="text-xl sm:text-2xl font-bold">{user?.username}</h1>
+                <p className="text-slate-400 text-sm sm:text-base">{user?.email}</p>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs sm:text-sm">
                   <span className="flex items-center gap-1 text-accent">
-                    <Clock className="w-4 h-4" />
-                    剩余生成次数: {user?.quota}
+                    <Clock className="w-3 h-3 sm:w-4 sm:h-4" />
+                    剩余: {user?.quota}次
                   </span>
                   {user?.is_admin && (
-                    <span className="px-2 py-1 bg-primary/20 text-primary rounded text-xs">
+                    <span className="px-2 py-0.5 bg-primary/20 text-primary rounded text-xs">
                       管理员
                     </span>
                   )}
@@ -120,9 +120,9 @@ function Profile() {
             </div>
             <button
               onClick={() => setIsEditing(!isEditing)}
-              className="p-3 bg-dark-200 hover:bg-dark-300 rounded-lg transition-colors"
+              className="p-2 sm:p-3 bg-dark-200 hover:bg-dark-300 rounded-lg transition-colors self-end sm:self-auto"
             >
-              {isEditing ? <X className="w-5 h-5" /> : <Edit2 className="w-5 h-5" />}
+              {isEditing ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
           </div>
 
@@ -135,7 +135,7 @@ function Profile() {
                   type="email"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full bg-dark/50 border border-dark-300 rounded-lg px-4 py-2 text-white focus:outline-none input-glow"
+                  className="w-full bg-dark/50 border border-dark-300 rounded-lg px-4 py-2 text-white focus:outline-none input-glow text-sm sm:text-base"
                 />
               </div>
               <div>
@@ -145,21 +145,21 @@ function Profile() {
                   value={editAvatar}
                   onChange={(e) => setEditAvatar(e.target.value)}
                   placeholder="https://example.com/avatar.jpg"
-                  className="w-full bg-dark/50 border border-dark-300 rounded-lg px-4 py-2 text-white focus:outline-none input-glow"
+                  className="w-full bg-dark/50 border border-dark-300 rounded-lg px-4 py-2 text-white focus:outline-none input-glow text-sm sm:text-base"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleSaveProfile}
                   disabled={saving}
-                  className="flex-1 py-2 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center gap-2 btn-glow disabled:opacity-50"
+                  className="flex-1 py-2 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center gap-2 btn-glow disabled:opacity-50 text-sm sm:text-base"
                 >
                   <Save className="w-4 h-4" />
                   {saving ? '保存中...' : '保存'}
                 </button>
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="flex-1 py-2 bg-dark-200 hover:bg-dark-300 rounded-lg transition-colors"
+                  className="flex-1 py-2 bg-dark-200 hover:bg-dark-300 rounded-lg transition-colors text-sm sm:text-base"
                 >
                   取消
                 </button>
@@ -169,35 +169,36 @@ function Profile() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-4 mb-8">
+        <div className="flex flex-wrap gap-2 sm:gap-4 mb-6 sm:mb-8">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all ${
+              className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl transition-all text-sm ${
                 tab === id
                   ? 'bg-gradient-to-r from-primary to-accent text-white btn-glow'
                   : 'bg-dark-100 text-slate-400 hover:text-white border border-dark-200'
               }`}
             >
               <Icon className="w-4 h-4" />
-              {label}
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">{id === 'my' ? '作品' : '收藏'}</span>
             </button>
           ))}
           <button
             onClick={logout}
-            className="ml-auto flex items-center gap-2 px-6 py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+            className="ml-auto flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors text-sm"
           >
             <LogOut className="w-4 h-4" />
-            退出登录
+            <span className="hidden sm:inline">退出登录</span>
           </button>
         </div>
 
         {/* Content */}
         {loading ? (
-          <div className="text-center py-20 text-slate-500">加载中...</div>
+          <div className="text-center py-16 sm:py-20 text-slate-500">加载中...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {(tab === 'my' ? animations : favorites).map(animation => (
               <div key={animation.id} className="relative group">
                 <AnimationCard animation={animation} showAuthor={false} />
@@ -216,7 +217,7 @@ function Profile() {
         )}
 
         {!loading && (tab === 'my' ? animations : favorites).length === 0 && (
-          <div className="text-center py-20 text-slate-500">
+          <div className="text-center py-16 sm:py-20 text-slate-500">
             {tab === 'my' ? '还没有创作任何动画' : '还没有收藏任何动画'}
           </div>
         )}

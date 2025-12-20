@@ -75,7 +75,6 @@ function Admin() {
         const res = await api.get('/admin/stats')
         setStats(res.data)
       } else if (tab === 'settings') {
-        // settings标签页由单独的useEffect处理
         setLoading(false)
         return
       } else if (tab === 'users') {
@@ -194,24 +193,91 @@ function Admin() {
   }
 
   const tabs = [
-    { id: 'stats', label: '统计概览', icon: BarChart3 },
-    { id: 'users', label: '用户管理', icon: Users },
-    { id: 'animations', label: '内容管理', icon: Film },
-    { id: 'settings', label: '系统设置', icon: Settings }
+    { id: 'stats', label: '统计', icon: BarChart3 },
+    { id: 'users', label: '用户', icon: Users },
+    { id: 'animations', label: '内容', icon: Film },
+    { id: 'settings', label: '设置', icon: Settings }
   ]
 
-  return (
-    <div className="py-12 px-4">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 gradient-text-animate inline-block">管理后台</h1>
+  // Mobile card component for users
+  const UserCard = ({ user }) => (
+    <div className="glow-border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="font-medium">{user.username}</div>
+          <div className="text-sm text-slate-400 truncate">{user.email}</div>
+        </div>
+        <span className={`text-xs px-2 py-1 rounded-full ${user.is_admin ? 'bg-primary/20 text-primary' : 'bg-dark-300 text-slate-400'}`}>
+          {user.is_admin ? '管理员' : '用户'}
+        </span>
+      </div>
+      <div className="flex items-center gap-4 text-sm">
+        <span className="text-slate-400">配额: <span className="text-accent">{user.quota}</span></span>
+        <span className="text-slate-400">动画: <span className="text-white">{user.animations_count}</span></span>
+      </div>
+      <div className="flex gap-2 pt-2 border-t border-dark-300">
+        <button
+          onClick={() => setSelectedUser(user.id)}
+          className="flex-1 px-3 py-2 bg-dark-300 hover:bg-dark-400 rounded-lg text-xs transition-colors"
+        >
+          编辑配额
+        </button>
+        <button
+          onClick={() => toggleAdmin(user.id)}
+          className="px-3 py-2 bg-dark-300 hover:bg-dark-400 rounded-lg text-xs transition-colors"
+        >
+          <Shield className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => deleteUser(user.id)}
+          className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-xs text-red-400 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  )
 
-        {/* Tabs */}
-        <div className="flex gap-4 mb-8">
+  // Mobile card component for animations
+  const AnimationCard = ({ animation }) => (
+    <div className="glow-border p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="font-medium truncate">{animation.title}</div>
+          <div className="text-sm text-slate-400">作者: {animation.author}</div>
+        </div>
+        <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${animation.is_public ? 'bg-green-500/20 text-green-400' : 'bg-dark-300 text-slate-400'}`}>
+          {animation.is_public ? '公开' : '私密'}
+        </span>
+      </div>
+      <div className="flex items-center gap-4 text-sm">
+        <span className="text-slate-400">分类: <span className="text-white">{animation.category}</span></span>
+        <span className="text-slate-400">点赞: <span className="text-accent">{animation.likes_count}</span></span>
+      </div>
+      <div className="pt-2 border-t border-dark-300">
+        <button
+          onClick={() => deleteAnimation(animation.id)}
+          className="w-full px-3 py-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-xs text-red-400 transition-colors flex items-center justify-center gap-1"
+        >
+          <Trash2 className="w-4 h-4" />
+          删除动画
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="py-6 md:py-12 px-4">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8 gradient-text-animate inline-block">管理后台</h1>
+
+        {/* Tabs - scrollable on mobile */}
+        <div className="flex gap-2 md:gap-4 mb-6 md:mb-8 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 scrollbar-hide">
           {tabs.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               onClick={() => { setTab(id); setPage(1) }}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl transition-all ${
+              className={`flex items-center gap-1.5 md:gap-2 px-4 md:px-6 py-2.5 md:py-3 rounded-xl transition-all whitespace-nowrap shrink-0 text-sm md:text-base ${
                 tab === id
                   ? 'bg-gradient-to-r from-primary to-accent text-white btn-glow'
                   : 'bg-dark-100 text-slate-400 hover:text-white border border-dark-200'
@@ -229,38 +295,38 @@ function Admin() {
           <>
             {/* Stats */}
             {tab === 'stats' && stats && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="glow-border p-6 card-hover">
-                    <div className="text-3xl font-bold gradient-text-animate">{stats.total_users}</div>
-                    <div className="text-slate-400 mt-2 text-sm">总用户数</div>
+              <div className="space-y-4 md:space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+                  <div className="glow-border p-4 md:p-6 card-hover">
+                    <div className="text-2xl md:text-3xl font-bold gradient-text-animate">{stats.total_users}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">总用户数</div>
                   </div>
-                  <div className="glow-border p-6 card-hover">
-                    <div className="text-3xl font-bold gradient-text-animate">{stats.total_animations}</div>
-                    <div className="text-slate-400 mt-2 text-sm">总动画数</div>
+                  <div className="glow-border p-4 md:p-6 card-hover">
+                    <div className="text-2xl md:text-3xl font-bold gradient-text-animate">{stats.total_animations}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">总动画数</div>
                   </div>
-                  <div className="glow-border p-6 card-hover">
-                    <div className="text-3xl font-bold gradient-text-animate">{stats.public_animations}</div>
-                    <div className="text-slate-400 mt-2 text-sm">公开动画数</div>
+                  <div className="glow-border p-4 md:p-6 card-hover">
+                    <div className="text-2xl md:text-3xl font-bold gradient-text-animate">{stats.public_animations}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">公开动画</div>
                   </div>
-                  <div className="glow-border p-6 card-hover">
-                    <div className="text-3xl font-bold gradient-text-animate">{stats.avg_quota.toFixed(1)}</div>
-                    <div className="text-slate-400 mt-2 text-sm">平均配额</div>
+                  <div className="glow-border p-4 md:p-6 card-hover">
+                    <div className="text-2xl md:text-3xl font-bold gradient-text-animate">{stats.avg_quota.toFixed(1)}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">平均配额</div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="glow-border p-6">
-                    <div className="text-2xl font-bold text-accent">{stats.new_users_7d}</div>
-                    <div className="text-slate-400 mt-2 text-sm">7天新增用户</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
+                  <div className="glow-border p-4 md:p-6">
+                    <div className="text-xl md:text-2xl font-bold text-accent">{stats.new_users_7d}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">7天新增用户</div>
                   </div>
-                  <div className="glow-border p-6">
-                    <div className="text-2xl font-bold text-accent">{stats.new_animations_7d}</div>
-                    <div className="text-slate-400 mt-2 text-sm">7天新增动画</div>
+                  <div className="glow-border p-4 md:p-6">
+                    <div className="text-xl md:text-2xl font-bold text-accent">{stats.new_animations_7d}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">7天新增动画</div>
                   </div>
-                  <div className="glow-border p-6">
-                    <div className="text-2xl font-bold text-accent">{stats.total_likes + stats.total_favorites}</div>
-                    <div className="text-slate-400 mt-2 text-sm">总互动数</div>
+                  <div className="glow-border p-4 md:p-6">
+                    <div className="text-xl md:text-2xl font-bold text-accent">{stats.total_likes + stats.total_favorites}</div>
+                    <div className="text-slate-400 mt-1 md:mt-2 text-xs md:text-sm">总互动数</div>
                   </div>
                 </div>
               </div>
@@ -269,84 +335,94 @@ function Admin() {
             {/* Users */}
             {tab === 'users' && (
               <div className="space-y-4">
-                <form onSubmit={handleSearch} className="glow-border p-4">
+                <form onSubmit={handleSearch} className="glow-border p-3 md:p-4">
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="搜索用户名或邮箱..."
-                      className="flex-1 bg-transparent rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none"
+                      className="flex-1 bg-transparent rounded-lg px-3 md:px-4 py-2 text-white placeholder-slate-500 focus:outline-none text-sm md:text-base"
                     />
                     <button
                       type="submit"
-                      className="px-6 py-2 bg-gradient-to-r from-primary to-accent rounded-lg text-sm btn-glow"
+                      className="px-4 md:px-6 py-2 bg-gradient-to-r from-primary to-accent rounded-lg text-sm btn-glow"
                     >
                       搜索
                     </button>
                   </div>
                 </form>
 
-                <div className="glow-border overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-dark-200">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">用户名</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">邮箱</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">配额</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">动画数</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">角色</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-dark-200">
-                      {users.map(user => (
-                        <tr key={user.id} className="hover:bg-dark-200/50 transition-colors">
-                          <td className="px-6 py-4 text-sm">{user.username}</td>
-                          <td className="px-6 py-4 text-sm text-slate-400">{user.email}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className="px-3 py-1 bg-dark-300 rounded-full text-accent">
-                              {user.quota}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm">{user.animations_count}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className={user.is_admin ? 'text-primary' : 'text-slate-500'}>
-                              {user.is_admin ? '管理员' : '用户'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => setSelectedUser(user.id)}
-                                className="px-3 py-1 bg-dark-300 hover:bg-dark-400 rounded text-xs transition-colors"
-                              >
-                                编辑
-                              </button>
-                              <button
-                                onClick={() => toggleAdmin(user.id)}
-                                className="px-3 py-1 bg-dark-300 hover:bg-dark-400 rounded text-xs flex items-center gap-1 transition-colors"
-                              >
-                                <Shield className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => deleteUser(user.id)}
-                                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded text-xs text-red-400 transition-colors"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </td>
+                {/* Desktop table */}
+                <div className="hidden md:block glow-border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-dark-200">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">用户名</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">邮箱</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">配额</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">动画数</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">角色</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">操作</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-dark-200">
+                        {users.map(user => (
+                          <tr key={user.id} className="hover:bg-dark-200/50 transition-colors">
+                            <td className="px-6 py-4 text-sm">{user.username}</td>
+                            <td className="px-6 py-4 text-sm text-slate-400">{user.email}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className="px-3 py-1 bg-dark-300 rounded-full text-accent">
+                                {user.quota}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm">{user.animations_count}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={user.is_admin ? 'text-primary' : 'text-slate-500'}>
+                                {user.is_admin ? '管理员' : '用户'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setSelectedUser(user.id)}
+                                  className="px-3 py-1 bg-dark-300 hover:bg-dark-400 rounded text-xs transition-colors"
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  onClick={() => toggleAdmin(user.id)}
+                                  className="px-3 py-1 bg-dark-300 hover:bg-dark-400 rounded text-xs flex items-center gap-1 transition-colors"
+                                >
+                                  <Shield className="w-3 h-3" />
+                                </button>
+                                <button
+                                  onClick={() => deleteUser(user.id)}
+                                  className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded text-xs text-red-400 transition-colors"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden space-y-3">
+                  {users.map(user => (
+                    <UserCard key={user.id} user={user} />
+                  ))}
                 </div>
 
                 {/* User Edit Modal */}
                 {selectedUser && (
-                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="glow-border p-6 max-w-md w-full mx-4">
+                  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="glow-border p-4 md:p-6 max-w-md w-full">
                       <h3 className="text-lg font-bold mb-4">编辑用户配额</h3>
                       
                       <div className="space-y-4">
@@ -403,15 +479,15 @@ function Admin() {
                     <button
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50"
+                      className="px-3 md:px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50 text-sm"
                     >
                       上一页
                     </button>
-                    <span className="px-4 py-2">{page} / {totalPages}</span>
+                    <span className="px-3 md:px-4 py-2 text-sm">{page} / {totalPages}</span>
                     <button
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages}
-                      className="px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50"
+                      className="px-3 md:px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50 text-sm"
                     >
                       下一页
                     </button>
@@ -423,61 +499,71 @@ function Admin() {
             {/* Animations */}
             {tab === 'animations' && (
               <div className="space-y-4">
-                <form onSubmit={handleSearch} className="glow-border p-4">
+                <form onSubmit={handleSearch} className="glow-border p-3 md:p-4">
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="搜索动画标题或描述..."
-                      className="flex-1 bg-transparent rounded-lg px-4 py-2 text-white placeholder-slate-500 focus:outline-none"
+                      className="flex-1 bg-transparent rounded-lg px-3 md:px-4 py-2 text-white placeholder-slate-500 focus:outline-none text-sm md:text-base"
                     />
                     <button
                       type="submit"
-                      className="px-6 py-2 bg-gradient-to-r from-primary to-accent rounded-lg text-sm btn-glow"
+                      className="px-4 md:px-6 py-2 bg-gradient-to-r from-primary to-accent rounded-lg text-sm btn-glow"
                     >
                       搜索
                     </button>
                   </div>
                 </form>
 
-                <div className="glow-border overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-dark-200">
-                      <tr>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">标题</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">作者</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">分类</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">点赞</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">公开</th>
-                        <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-dark-200">
-                      {animations.map(animation => (
-                        <tr key={animation.id} className="hover:bg-dark-200/50 transition-colors">
-                          <td className="px-6 py-4 text-sm truncate">{animation.title}</td>
-                          <td className="px-6 py-4 text-sm text-slate-400">{animation.author}</td>
-                          <td className="px-6 py-4 text-sm text-slate-400">{animation.category}</td>
-                          <td className="px-6 py-4 text-sm text-accent">{animation.likes_count}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className={animation.is_public ? 'text-green-400' : 'text-slate-500'}>
-                              {animation.is_public ? '是' : '否'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm">
-                            <button
-                              onClick={() => deleteAnimation(animation.id)}
-                              className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded text-xs text-red-400 transition-colors flex items-center gap-1"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              删除
-                            </button>
-                          </td>
+                {/* Desktop table */}
+                <div className="hidden md:block glow-border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-dark-200">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">标题</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">作者</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">分类</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">点赞</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">公开</th>
+                          <th className="px-6 py-4 text-left text-sm font-medium text-slate-400">操作</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-dark-200">
+                        {animations.map(animation => (
+                          <tr key={animation.id} className="hover:bg-dark-200/50 transition-colors">
+                            <td className="px-6 py-4 text-sm truncate max-w-[200px]">{animation.title}</td>
+                            <td className="px-6 py-4 text-sm text-slate-400">{animation.author}</td>
+                            <td className="px-6 py-4 text-sm text-slate-400">{animation.category}</td>
+                            <td className="px-6 py-4 text-sm text-accent">{animation.likes_count}</td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className={animation.is_public ? 'text-green-400' : 'text-slate-500'}>
+                                {animation.is_public ? '是' : '否'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <button
+                                onClick={() => deleteAnimation(animation.id)}
+                                className="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded text-xs text-red-400 transition-colors flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                删除
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Mobile cards */}
+                <div className="md:hidden space-y-3">
+                  {animations.map(animation => (
+                    <AnimationCard key={animation.id} animation={animation} />
+                  ))}
                 </div>
 
                 {/* Pagination */}
@@ -486,15 +572,15 @@ function Admin() {
                     <button
                       onClick={() => setPage(p => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50"
+                      className="px-3 md:px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50 text-sm"
                     >
                       上一页
                     </button>
-                    <span className="px-4 py-2">{page} / {totalPages}</span>
+                    <span className="px-3 md:px-4 py-2 text-sm">{page} / {totalPages}</span>
                     <button
                       onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                       disabled={page === totalPages}
-                      className="px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50"
+                      className="px-3 md:px-4 py-2 bg-dark-100 rounded-lg disabled:opacity-50 text-sm"
                     >
                       下一页
                     </button>
@@ -505,37 +591,37 @@ function Admin() {
 
             {/* Settings */}
             {tab === 'settings' && (
-              <div className="space-y-6">
+              <div className="space-y-4 md:space-y-6">
                 {/* AI模型配置 */}
-                <div className="glow-border p-6">
-                  <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <div className="glow-border p-4 md:p-6">
+                  <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 flex items-center gap-2">
                     <Cpu className="w-5 h-5 text-accent" />
                     AI 模型配置
                   </h3>
-                  <p className="text-sm text-slate-400 mb-4">
+                  <p className="text-xs md:text-sm text-slate-400 mb-4">
                     选择系统使用的AI模型，不同模型有不同的生成效果和速度
                   </p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
                     {models.map(model => (
                       <div
                         key={model.id}
                         onClick={() => !modelLoading && handleModelChange(model.id)}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        className={`p-3 md:p-4 rounded-xl border-2 cursor-pointer transition-all ${
                           currentModel?.id === model.id
                             ? 'border-accent bg-accent/10'
                             : 'border-dark-300 hover:border-primary/50 bg-dark-200'
                         } ${modelLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium">{model.name}</span>
+                          <span className="font-medium text-sm md:text-base">{model.name}</span>
                           {currentModel?.id === model.id && (
                             <span className="px-2 py-0.5 bg-accent/20 text-accent text-xs rounded-full">
                               当前
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500">{model.id}</p>
+                        <p className="text-xs text-slate-500 truncate">{model.id}</p>
                         <p className="text-xs text-slate-400 mt-1">
                           提供商: {model.provider === 'claude' ? 'Anthropic' : 'Google'}
                         </p>
@@ -549,30 +635,30 @@ function Admin() {
                 </div>
 
                 {/* 其他设置 */}
-                <div className="glow-border p-6">
-                  <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <div className="glow-border p-4 md:p-6">
+                  <h3 className="text-base md:text-lg font-medium mb-3 md:mb-4 flex items-center gap-2">
                     <Settings className="w-5 h-5 text-primary" />
                     其他设置
                   </h3>
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-dark-200 rounded-lg">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 md:p-4 bg-dark-200 rounded-lg">
                       <div>
-                        <p className="font-medium">新用户默认配额</p>
-                        <p className="text-sm text-slate-400">新注册用户的初始生成次数</p>
+                        <p className="font-medium text-sm md:text-base">新用户默认配额</p>
+                        <p className="text-xs md:text-sm text-slate-400">新注册用户的初始生成次数</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
                           value={defaultQuota}
                           onChange={(e) => setDefaultQuota(e.target.value)}
-                          className="w-20 bg-dark-300 border border-dark-400 rounded-lg px-3 py-2 text-center"
+                          className="w-20 bg-dark-300 border border-dark-400 rounded-lg px-3 py-2 text-center text-sm"
                         />
                         <button
                           onClick={handleSaveDefaultQuota}
                           className="px-4 py-2 bg-gradient-to-r from-primary to-accent rounded-lg text-sm flex items-center gap-1 btn-glow"
                         >
                           <Save className="w-4 h-4" />
-                          保存
+                          <span className="hidden sm:inline">保存</span>
                         </button>
                       </div>
                     </div>

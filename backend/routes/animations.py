@@ -245,6 +245,9 @@ def export_animation(animation_id, format):
     duration = request.args.get('duration', 5, type=int)
     duration = max(1, min(30, duration))
     
+    # 获取背景颜色参数
+    bg_color = request.args.get('bgColor', None)
+    
     # 根据格式设置帧率
     fps = 8 if format == 'gif' else 20
     
@@ -254,7 +257,8 @@ def export_animation(animation_id, format):
             animation.svg_content,
             format=format,
             duration=duration,
-            fps=fps
+            fps=fps,
+            bg_color=bg_color
         )
         
         # 设置响应头 - 使用 ASCII 安全的文件名
@@ -305,6 +309,10 @@ def export_animation_stream(animation_id, format):
     
     duration = request.args.get('duration', 5, type=int)
     duration = max(1, min(30, duration))
+    
+    # 获取背景颜色参数
+    bg_color = request.args.get('bgColor', None)
+    
     fps = 8 if format == 'gif' else 20
     
     svg_content = animation.svg_content
@@ -324,7 +332,8 @@ def export_animation_stream(animation_id, format):
                     format=format,
                     duration=duration,
                     fps=fps,
-                    on_progress=on_progress
+                    on_progress=on_progress,
+                    bg_color=bg_color
                 )
                 result_holder['data'] = data
             except Exception as e:

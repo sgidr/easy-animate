@@ -1,11 +1,77 @@
 import api from '../services/api'
 
 /**
+ * 修改SVG背景颜色
+ */
+const modifySVGBackground = (svgContent, bgColor) => {
+  if (!svgContent || !bgColor) return svgContent
+  
+  // 解析SVG内容
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(svgContent, 'image/svg+xml')
+  const svg = doc.querySelector('svg')
+  
+  if (!svg) return svgContent
+  
+  // 查找背景矩形（通常是第一个rect，覆盖整个画布）
+  const rects = svg.querySelectorAll('rect')
+  let bgRect = null
+  
+  for (const rect of rects) {
+    const width = rect.getAttribute('width')
+    const height = rect.getAttribute('height')
+    const x = rect.getAttribute('x') || '0'
+    const y = rect.getAttribute('y') || '0'
+    
+    // 检查是否是背景矩形（覆盖整个画布或接近整个画布）
+    if ((width === '800' || width === '100%') && 
+        (height === '600' || height === '100%') &&
+        (x === '0' || !x) && (y === '0' || !y)) {
+      bgRect = rect
+      break
+    }
+  }
+  
+  if (bgRect) {
+    // 修改背景矩形的填充颜色
+    if (bgColor === 'transparent') {
+      bgRect.setAttribute('fill', 'transparent')
+      bgRect.setAttribute('fill-opacity', '0')
+    } else {
+      bgRect.setAttribute('fill', bgColor)
+      bgRect.removeAttribute('fill-opacity')
+    }
+  } else if (bgColor !== 'transparent') {
+    // 如果没有背景矩形，创建一个
+    const viewBox = svg.getAttribute('viewBox') || '0 0 800 600'
+    const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number)
+    
+    const newRect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect')
+    newRect.setAttribute('width', vbWidth || 800)
+    newRect.setAttribute('height', vbHeight || 600)
+    newRect.setAttribute('fill', bgColor)
+    
+    // 插入到SVG的最前面
+    svg.insertBefore(newRect, svg.firstChild)
+  }
+  
+  // 序列化回字符串
+  const serializer = new XMLSerializer()
+  return serializer.serializeToString(svg)
+}
+
+/**
  * 导出SVG文件
  */
-export const exportSVG = (svgElement, filename = 'animation') => {
+export const exportSVG = (svgElement, filename = 'animation', bgColor = null) => {
   if (!svgElement) return false
-  const svgData = svgElement.innerHTML
+  let svgData = svgElement.innerHTML
+  
+  // 如果指定了背景颜色，修改SVG
+  if (bgColor) {
+    svgData = modifySVGBackground(svgData, bgColor)
+  }
+  
   const blob = new Blob([svgData], { type: 'image/svg+xml' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -168,9 +234,10 @@ const exportWithEventSource = (url, filename, format, onProgress) => {
 /**
  * 通用 SSE 导出函数
  */
-const exportWithSSE = async (animationId, format, filename, duration, onProgress) => {
-  const publicUrl = `/api/community/animations/${animationId}/export-stream/${format}?duration=${duration}`
-  const privateUrl = `/api/animations/${animationId}/export-stream/${format}?duration=${duration}`
+const exportWithSSE = async (animationId, format, filename, duration, onProgress, bgColor = null) => {
+  const bgParam = bgColor ? `&bgColor=${encodeURIComponent(bgColor)}` : ''
+  const publicUrl = `/api/community/animations/${animationId}/export-stream/${format}?duration=${duration}${bgParam}`
+  const privateUrl = `/api/animations/${animationId}/export-stream/${format}?duration=${duration}${bgParam}`
   
   // 先尝试公开端点（使用 EventSource）
   try {
@@ -195,50 +262,53 @@ const exportWithSSE = async (animationId, format, filename, duration, onProgress
 /**
  * 通过后端API导出MP4视频（带真实进度）
  */
-export const exportVideo = async (animationId, filename = 'animation', duration = 5, onProgress) => {
+export const exportVideo = async (animationId, filename = 'animation', duration = 5, onProgress, bgColor = null) => {
   if (!animationId) throw new Error('动画ID不存在')
   
   try {
-    return await exportWithSSE(animationId, 'mp4', filename, duration, onProgress)
+    return await exportWithSSE(animationId, 'mp4', filename, duration, onProgress, bgColor)
   } catch (err) {
     console.warn('SSE 导出失败，尝试普通请求:', err.message)
-    return await exportFallback(animationId, 'mp4', filename, duration, onProgress)
+    return await exportFallback(animationId, 'mp4', filename, duration, onProgress, bgColor)
   }
 }
 
 /**
  * 通过后端API导出GIF动画（带真实进度）
  */
-export const exportGIF = async (animationId, filename = 'animation', duration = 5, onProgress) => {
+export const exportGIF = async (animationId, filename = 'animation', duration = 5, onProgress, bgColor = null) => {
   if (!animationId) throw new Error('动画ID不存在')
   
   try {
-    return await exportWithSSE(animationId, 'gif', filename, duration, onProgress)
+    return await exportWithSSE(animationId, 'gif', filename, duration, onProgress, bgColor)
   } catch (err) {
     console.warn('SSE 导出失败，尝试普通请求:', err.message)
-    return await exportFallback(animationId, 'gif', filename, duration, onProgress)
+    return await exportFallback(animationId, 'gif', filename, duration, onProgress, bgColor)
   }
 }
 
 /**
  * 备用导出方法（无真实进度）
  */
-const exportFallback = async (animationId, format, filename, duration, onProgress) => {
+const exportFallback = async (animationId, format, filename, duration, onProgress, bgColor = null) => {
   const timeout = Math.max(240000, 30000 + duration * 15000)
   
   if (onProgress) onProgress(10, '正在导出...')
   
+  const params = { duration }
+  if (bgColor) params.bgColor = bgColor
+  
   let response
   try {
     response = await api.get(`/community/animations/${animationId}/export/${format}`, {
-      params: { duration },
+      params,
       responseType: 'blob',
       timeout
     })
   } catch (err) {
     if (err.response?.status === 403 || err.response?.status === 404) {
       response = await api.get(`/animations/${animationId}/export/${format}`, {
-        params: { duration },
+        params,
         responseType: 'blob',
         timeout
       })

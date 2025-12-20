@@ -3,6 +3,7 @@
 使用 Playwright 无头浏览器渲染真实的 SVG 动画
 支持进度回调
 支持透明背景GIF导出
+支持自定义背景颜色
 """
 import os
 import io
@@ -17,6 +18,38 @@ logger = logging.getLogger(__name__)
 class ExportService:
     def __init__(self):
         self.temp_dir = tempfile.gettempdir()
+    
+    def _modify_svg_background(self, svg_content, bg_color):
+        """修改SVG的背景颜色"""
+        if not bg_color:
+            return svg_content
+        
+        # 查找背景矩形并修改其填充颜色
+        # 匹配类似 <rect width="800" height="600" fill="..."/> 的背景矩形
+        def replace_bg_rect(match):
+            rect_tag = match.group(0)
+            # 检查是否是背景矩形（宽度800或100%，高度600或100%）
+            if re.search(r'width\s*=\s*["\'](?:800|100%)["\']', rect_tag) and \
+               re.search(r'height\s*=\s*["\'](?:600|100%)["\']', rect_tag):
+                # 替换fill属性
+                if bg_color == 'transparent':
+                    new_fill = 'fill="transparent" fill-opacity="0"'
+                else:
+                    new_fill = f'fill="{bg_color}"'
+                
+                # 移除现有的fill和fill-opacity属性
+                rect_tag = re.sub(r'\s*fill\s*=\s*["\'][^"\']*["\']', '', rect_tag)
+                rect_tag = re.sub(r'\s*fill-opacity\s*=\s*["\'][^"\']*["\']', '', rect_tag)
+                
+                # 在rect标签中添加新的fill属性
+                rect_tag = rect_tag.replace('<rect', f'<rect {new_fill}', 1)
+                return rect_tag
+            return match.group(0)
+        
+        # 替换所有rect标签
+        modified_svg = re.sub(r'<rect[^>]*>', replace_bg_rect, svg_content)
+        
+        return modified_svg
     
     def _detect_transparent_background(self, svg_content):
         """检测SVG是否使用透明背景"""
@@ -67,7 +100,7 @@ class ExportService:
         logger.info(f"透明背景检测结果: has_bg_rect={has_bg_rect is not None}")
         return False
     
-    async def _capture_animation_frames_async(self, svg_content, duration=3, fps=10, width=800, height=600, on_progress=None, transparent=False):
+    async def _capture_animation_frames_async(self, svg_content, duration=3, fps=10, width=800, height=600, on_progress=None, transparent=False, bg_color=None):
         """使用 Playwright 捕获 SVG 动画帧"""
         frames = []
         total_frames = int(duration * fps)
@@ -80,7 +113,7 @@ class ExportService:
         try:
             from playwright.async_api import async_playwright
             
-            logger.info(f"开始捕获动画帧: duration={duration}s, fps={fps}, total_frames={total_frames}, transparent={transparent}")
+            logger.info(f"开始捕获动画帧: duration={duration}s, fps={fps}, total_frames={total_frames}, transparent={transparent}, bg_color={bg_color}")
             
             if on_progress:
                 on_progress(5, "正在启动浏览器...")
@@ -109,8 +142,13 @@ class ExportService:
             if on_progress:
                 on_progress(10, "正在加载动画...")
             
-            # 根据是否透明设置背景
-            bg_style = 'transparent' if transparent else '#0f172a'
+            # 根据是否透明或自定义颜色设置背景
+            if transparent:
+                bg_style = 'transparent'
+            elif bg_color:
+                bg_style = bg_color
+            else:
+                bg_style = '#0f172a'
             
             html_content = f'''
             <!DOCTYPE html>
@@ -274,14 +312,14 @@ class ExportService:
         
         return image
     
-    def capture_animation_frames(self, svg_content, duration=3, fps=10, width=800, height=600, on_progress=None, transparent=False):
+    def capture_animation_frames(self, svg_content, duration=3, fps=10, width=800, height=600, on_progress=None, transparent=False, bg_color=None):
         """同步包装器"""
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             try:
                 frames = loop.run_until_complete(
-                    self._capture_animation_frames_async(svg_content, duration, fps, width, height, on_progress, transparent)
+                    self._capture_animation_frames_async(svg_content, duration, fps, width, height, on_progress, transparent, bg_color)
                 )
             finally:
                 loop.close()
@@ -290,8 +328,8 @@ class ExportService:
             logger.error(f"异步捕获失败: {e}")
             return self._create_static_frames(svg_content, int(duration * fps), width, height, transparent)
     
-    def export_to_bytes_with_progress(self, svg_content, format='gif', duration=5, fps=10, width=640, height=480, on_progress=None):
-        """导出为字节流，支持进度回调"""
+    def export_to_bytes_with_progress(self, svg_content, format='gif', duration=5, fps=10, width=640, height=480, on_progress=None, bg_color=None):
+        """导出为字节流，支持进度回调和自定义背景颜色"""
         try:
             import imageio
             import numpy as np
@@ -309,14 +347,35 @@ class ExportService:
                 height = 600
                 fps = 10
             
-            # 检测是否需要透明背景（仅GIF支持）
+            # 处理背景颜色
             transparent = False
-            if format == 'gif':
-                transparent = self._detect_transparent_background(svg_content)
-                if transparent:
-                    logger.info("检测到透明背景SVG，将导出透明GIF")
+            actual_bg_color = bg_color
             
-            frames = self.capture_animation_frames(svg_content, duration, fps, width, height, on_progress, transparent)
+            if bg_color == 'transparent':
+                if format == 'gif':
+                    transparent = True
+                    actual_bg_color = None
+                else:
+                    # MP4不支持透明，使用默认背景
+                    actual_bg_color = '#0f172a'
+                    logger.info("MP4不支持透明背景，使用默认背景色")
+            elif not bg_color:
+                # 如果没有指定背景颜色，检测SVG是否需要透明背景（仅GIF）
+                if format == 'gif':
+                    transparent = self._detect_transparent_background(svg_content)
+                    if transparent:
+                        logger.info("检测到透明背景SVG，将导出透明GIF")
+            
+            # 如果指定了背景颜色，修改SVG内容
+            modified_svg = svg_content
+            if actual_bg_color:
+                modified_svg = self._modify_svg_background(svg_content, actual_bg_color)
+                logger.info(f"已修改SVG背景颜色为: {actual_bg_color}")
+            elif transparent:
+                modified_svg = self._modify_svg_background(svg_content, 'transparent')
+                logger.info("已设置SVG背景为透明")
+            
+            frames = self.capture_animation_frames(modified_svg, duration, fps, width, height, on_progress, transparent, actual_bg_color)
             
             if not frames:
                 raise Exception("没有捕获到任何帧")
@@ -497,8 +556,8 @@ class ExportService:
             
             logger.info(f"透明GIF保存成功，使用统一调色板，透明色索引: {transparency_index}")
     
-    def export_to_bytes(self, svg_content, format='gif', duration=5, fps=10, width=640, height=480):
+    def export_to_bytes(self, svg_content, format='gif', duration=5, fps=10, width=640, height=480, bg_color=None):
         """导出为字节流（无进度回调）"""
-        return self.export_to_bytes_with_progress(svg_content, format, duration, fps, width, height, None)
+        return self.export_to_bytes_with_progress(svg_content, format, duration, fps, width, height, None, bg_color)
 
 export_service = ExportService()
