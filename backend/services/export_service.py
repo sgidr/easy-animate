@@ -86,7 +86,24 @@ class ExportService:
                 on_progress(5, "正在启动浏览器...")
             
             playwright = await async_playwright().start()
-            browser = await playwright.chromium.launch(headless=True)
+            
+            # 启动浏览器，添加更多参数以支持无头服务器环境
+            browser = await playwright.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu',
+                    '--single-process',  # 在某些环境下需要
+                ]
+            )
+            
+            logger.info("✅ Playwright 浏览器启动成功")
+            
             page = await browser.new_page(viewport={'width': width, 'height': height})
             
             if on_progress:
@@ -163,10 +180,27 @@ class ExportService:
             
             logger.info(f"帧捕获完成，共 {len(frames)} 帧")
             
-        except Exception as e:
-            logger.error(f"Playwright 捕获失败: {e}")
+        except ImportError as e:
+            logger.error(f"❌ Playwright 未安装: {e}")
+            logger.error("请运行: pip install playwright && playwright install chromium")
             if on_progress:
-                on_progress(15, "使用备用渲染方案...")
+                on_progress(15, "Playwright未安装，使用备用方案...")
+            frames = self._create_static_frames(svg_content, total_frames, width, height, transparent)
+        except Exception as e:
+            logger.error(f"❌ Playwright 捕获失败: {e}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            import traceback
+            logger.error(f"详细错误: {traceback.format_exc()}")
+            
+            # 检查是否是浏览器启动问题
+            error_str = str(e).lower()
+            if 'browser' in error_str or 'chromium' in error_str or 'executable' in error_str:
+                logger.error("💡 提示: 可能需要安装浏览器依赖")
+                logger.error("   Ubuntu: sudo ./install_playwright.sh")
+                logger.error("   或运行: playwright install --with-deps chromium")
+            
+            if on_progress:
+                on_progress(15, "浏览器启动失败，使用备用方案...")
             frames = self._create_static_frames(svg_content, total_frames, width, height, transparent)
         finally:
             if page:
@@ -265,12 +299,15 @@ class ExportService:
             if on_progress:
                 on_progress(0, "开始导出...")
             
+            # 提高分辨率以获得更好的质量
             if format == 'mp4':
                 width = 800
-                height = 608
+                height = 600
+                fps = 15  # 提高帧率
             else:
-                width = 640
-                height = 480
+                width = 800  # GIF也使用更高分辨率
+                height = 600
+                fps = 10
             
             # 检测是否需要透明背景（仅GIF支持）
             transparent = False
@@ -297,15 +334,31 @@ class ExportService:
                     # 透明GIF需要特殊处理
                     self._save_transparent_gif(frames, temp_path, fps)
                 else:
-                    frame_arrays = [np.array(f) for f in frames]
-                    imageio.mimsave(temp_path, frame_arrays, format='GIF', duration=1/fps, loop=0)
+                    # 使用PIL保存高质量GIF
+                    self._save_high_quality_gif(frames, temp_path, fps)
+                
+                logger.info(f"GIF导出完成: {len(frames)}帧, {fps}fps, 透明={transparent}")
             else:
                 # MP4不支持透明，转换为RGB
                 frame_arrays = [np.array(f.convert('RGB') if f.mode == 'RGBA' else f) for f in frames]
-                writer = imageio.get_writer(temp_path, fps=fps, codec='libx264', quality=8)
+                
+                # 使用更高质量的编码参数
+                writer = imageio.get_writer(
+                    temp_path, 
+                    fps=fps, 
+                    codec='libx264',
+                    quality=9,  # 提高质量 (0-10, 10最高)
+                    pixelformat='yuv420p',  # 兼容性更好
+                    output_params=[
+                        '-preset', 'slow',  # 更慢但质量更好
+                        '-crf', '18',  # 恒定质量因子 (0-51, 越低质量越好)
+                    ]
+                )
                 for frame in frame_arrays:
                     writer.append_data(frame)
                 writer.close()
+                
+                logger.info(f"MP4导出完成: {len(frame_arrays)}帧, {fps}fps")
             
             if on_progress:
                 on_progress(95, "正在读取文件...")
@@ -322,6 +375,50 @@ class ExportService:
         except Exception as e:
             logger.error(f"导出失败: {e}")
             raise Exception(f"导出失败: {str(e)}")
+    
+    def _save_high_quality_gif(self, frames, output_path, fps):
+        """保存高质量GIF - 使用统一调色板"""
+        if not frames:
+            return
+        
+        import numpy as np
+        
+        duration_ms = int(1000 / fps)
+        
+        # 收集所有帧用于创建统一调色板
+        frame_list = [f.convert('RGB') if f.mode != 'RGB' else f for f in frames]
+        
+        # 取样帧创建统一调色板
+        sample_frames = frame_list[::max(1, len(frame_list)//10)][:10]
+        width, height = frame_list[0].size
+        
+        # 创建合并图像
+        combined_width = width * len(sample_frames)
+        combined_img = Image.new('RGB', (combined_width, height))
+        
+        for i, frame in enumerate(sample_frames):
+            combined_img.paste(frame, (i * width, 0))
+        
+        # 量化得到统一调色板
+        quantized_combined = combined_img.quantize(colors=256, method=Image.Quantize.MEDIANCUT)
+        
+        # 使用统一调色板处理所有帧
+        processed_frames = []
+        for frame in frame_list:
+            p_frame = frame.quantize(palette=quantized_combined, dither=Image.Dither.FLOYDSTEINBERG)
+            processed_frames.append(p_frame)
+        
+        # 保存GIF
+        processed_frames[0].save(
+            output_path,
+            save_all=True,
+            append_images=processed_frames[1:],
+            duration=duration_ms,
+            loop=0,
+            optimize=False  # 不优化以保持质量
+        )
+        
+        logger.info(f"高质量GIF保存成功: {len(processed_frames)}帧")
     
     def _save_transparent_gif(self, frames, output_path, fps):
         """保存透明背景GIF - 使用统一调色板避免闪烁"""

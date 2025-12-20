@@ -1,7 +1,29 @@
 import axios from 'axios'
 
+// 确定API基础URL
+// 开发环境：使用相对路径 /api（由vite代理到后端）
+// 生产环境：
+//   - 如果设置了 VITE_BACKEND_URL，使用完整URL
+//   - 如果没设置或为空，使用相对路径（通过Nginx代理）
+const getBaseURL = () => {
+  if (import.meta.env.DEV) {
+    // 开发环境使用相对路径
+    return '/api'
+  } else {
+    // 生产环境
+    const backendUrl = import.meta.env.VITE_BACKEND_URL
+    if (backendUrl && backendUrl.trim()) {
+      // 如果设置了后端URL，使用完整URL
+      return `${backendUrl}/api`
+    } else {
+      // 没设置则使用相对路径（通过Nginx反向代理）
+      return '/api'
+    }
+  }
+}
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getBaseURL(),
   timeout: 240000,
   headers: {
     'Content-Type': 'application/json'

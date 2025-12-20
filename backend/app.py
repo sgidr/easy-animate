@@ -19,7 +19,17 @@ def create_app():
     logger.info("🚀 Easy Animate 后端启动中...")
     
     # 初始化扩展
-    CORS(app, origins=['http://localhost:5173', 'http://localhost:3000'])
+    # CORS配置 - 支持开发和生产环境
+    cors_origins = Config.get_cors_origins()
+    logger.info(f"✅ CORS允许的源: {cors_origins}")
+    
+    CORS(app, 
+         origins=cors_origins,
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         allow_headers=['Content-Type', 'Authorization'],
+         supports_credentials=True,
+         max_age=3600)
+    
     jwt = JWTManager(app)
     db.init_app(app)
     

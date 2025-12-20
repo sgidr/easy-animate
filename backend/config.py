@@ -25,3 +25,24 @@ class Config:
     
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB
+    
+    # CORS配置 - 从环境变量读取，默认支持常见的开发和生产环境
+    @staticmethod
+    def get_cors_origins():
+        """获取允许的CORS源"""
+        # 从环境变量读取，多个源用逗号分隔
+        cors_env = os.environ.get('CORS_ORIGINS', '')
+        
+        if cors_env:
+            # 如果设置了环境变量，使用它
+            return [origin.strip() for origin in cors_env.split(',')]
+        
+        # 默认允许的源
+        return [
+            'http://localhost:5173',           # 本地开发前端
+            'http://localhost:3000',           # 本地生产前端
+            'http://localhost:8000',           # 本地部署前端
+            'http://easyanimate.awei6.site',   # 生产域名
+            'https://easyanimate.awei6.site',  # 生产域名HTTPS
+            'http://106.13.112.233:5000',      # 后端IP（用于测试）
+        ]
