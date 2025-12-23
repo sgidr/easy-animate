@@ -148,38 +148,42 @@ function Create() {
   }
   const handleProgressChange = (e) => seekToTime(parseFloat(e.target.value))
 
-  // Sidebar Component
-  const HistorySidebar = ({ mobile = false }) => (
-    <div className={mobile ? '' : 'hidden lg:block w-64 xl:w-72 border-r border-dark-200 p-4 h-[calc(100vh-64px)] overflow-y-auto flex-shrink-0'}>
-      <h3 className="text-sm font-medium text-slate-400 mb-4">历史创作</h3>
-      <div className="space-y-2">
-        {history.map(item => (
-          <div key={item.id} className={`group relative ${animation?.id === item.id ? 'ring-2 ring-accent rounded-lg' : ''}`}>
-            <button onClick={() => handleLoadHistory(item)} className="w-full text-left p-3 bg-dark-100 rounded-lg hover:bg-dark-200 transition-colors">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium truncate flex-1">{item.title}</p>
-                {item.is_public ? <Globe className="w-3.5 h-3.5 text-green-400 flex-shrink-0" /> : <Lock className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />}
-              </div>
-              <p className="text-xs text-gray-500 mt-1 truncate">{item.prompt}</p>
-              <p className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</p>
-            </button>
-            <div className="absolute top-2 right-6 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button onClick={(e) => handleToggleShare(item, e)} className={`p-1.5 rounded ${item.is_public ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>
-                {item.is_public ? <Lock className="w-3.5 h-3.5" /> : <Globe className="w-3.5 h-3.5" />}
-              </button>
-              <button onClick={(e) => handleDeleteHistory(item.id, e)} className="p-1.5 bg-red-500/20 text-red-400 rounded"><Trash2 className="w-3.5 h-3.5" /></button>
+  // Sidebar content renderer
+  const renderHistoryItems = () => (
+    <>
+      {history.map(item => (
+        <div key={item.id} className={`bg-dark-100 rounded-lg overflow-hidden ${animation?.id === item.id ? 'ring-2 ring-accent' : ''}`}>
+          <button onClick={() => handleLoadHistory(item)} className="w-full text-left p-3 hover:bg-dark-200 transition-colors">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium truncate flex-1">{item.title}</p>
             </div>
+            <p className="text-xs text-gray-500 mt-1 truncate">{item.prompt}</p>
+            <p className="text-xs text-gray-600 mt-1">{new Date(item.created_at).toLocaleDateString()}</p>
+          </button>
+          <div className="flex gap-1 px-3 pb-3 border-t border-dark-300 pt-2">
+            <button onClick={(e) => handleToggleShare(item, e)} className={`flex-1 py-1.5 rounded text-xs flex items-center justify-center gap-1 ${item.is_public ? 'bg-green-500/20 text-green-400' : 'bg-dark-300 text-slate-400 hover:text-white'}`}>
+              {item.is_public ? <><Globe className="w-3 h-3" />已分享</> : <><Lock className="w-3 h-3" />分享</>}
+            </button>
+            <button onClick={(e) => handleDeleteHistory(item.id, e)} className="px-3 py-1.5 bg-dark-300 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded text-xs flex items-center gap-1 transition-colors">
+              <Trash2 className="w-3 h-3" />
+            </button>
           </div>
-        ))}
-        {history.length === 0 && <p className="text-sm text-slate-500 text-center py-4">暂无历史记录</p>}
-      </div>
-    </div>
+        </div>
+      ))}
+      {history.length === 0 && <p className="text-sm text-slate-500 text-center py-4">暂无历史记录</p>}
+    </>
   )
 
   return (
     <div className="min-h-screen bg-dark">
       <div className="flex">
-        <HistorySidebar />
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block w-64 xl:w-72 border-r border-dark-200 p-4 h-[calc(100vh-64px)] overflow-y-auto flex-shrink-0">
+          <h3 className="text-sm font-medium text-slate-400 mb-4">历史创作</h3>
+          <div className="space-y-2">
+            {renderHistoryItems()}
+          </div>
+        </div>
 
         {/* Main Content */}
         <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-x-hidden">
@@ -364,7 +368,9 @@ function Create() {
               <h3 className="text-sm font-medium text-slate-400">历史创作</h3>
               <button onClick={() => setShowMobileSidebar(false)} className="p-1"><X className="w-5 h-5" /></button>
             </div>
-            <HistorySidebar mobile />
+            <div className="space-y-2">
+              {renderHistoryItems()}
+            </div>
           </div>
         </div>
       )}
