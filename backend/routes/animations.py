@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response, stream_with_context
 from flask_jwt_extended import jwt_required, get_jwt_identity, jwt_required
 from models import db, User, Animation, Like, Favorite, GenerationTask
 from services.ai_service import ai_service
@@ -6,6 +6,97 @@ from datetime import datetime
 import json
 
 animations_bp = Blueprint('animations', __name__)
+
+@animations_bp.route('/generate-stream', methods=['POST'])
+@jwt_required()
+def generate_animation_stream():
+    """流式生成动画，实时返回进度"""
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    
+    if not user:
+        return jsonify({'error': '用户不存在'}), 404
+    
+    if user.quota <= 0:
+        return jsonify({'error': '生成次数已用完，请联系管理员'}), 403
+    
+    data = request.get_json()
+    prompt = data.get('prompt')
+    duration = data.get('duration', 30)
+    params = data.get('params', {})
+    
+    if not prompt:
+        return jsonify({'error': '请输入动画描述'}), 400
+    
+    # 创建生成任务
+    task = GenerationTask(user_id=user_id, prompt=prompt, status='processing')
+    db.session.add(task)
+    db.session.commit()
+    task_id = task.id
+    
+    def generate():
+        animation_result = None
+        
+        for event in ai_service.generate_animation_stream(prompt, duration, params):
+            if event['type'] == 'progress':
+                yield f"data: {json.dumps(event)}\n\n"
+            elif event['type'] == 'complete':
+                animation_result = event['data']
+                # 先发送完成进度
+                yield f"data: {json.dumps({'type': 'progress', 'progress': 100, 'tokens': event.get('tokens', 0), 'message': '保存中...'})}\n\n"
+            elif event['type'] == 'error':
+                # 更新任务状态
+                with db.session.begin():
+                    t = GenerationTask.query.get(task_id)
+                    if t:
+                        t.status = 'failed'
+                        t.error_message = event['message']
+                yield f"data: {json.dumps(event)}\n\n"
+                return
+        
+        if animation_result:
+            try:
+                # 创建动画记录
+                animation = Animation(
+                    title=animation_result.get('title', '未命名动画'),
+                    description=animation_result.get('description', ''),
+                    prompt=prompt,
+                    svg_content=animation_result.get('svg_content', ''),
+                    animation_data=json.dumps(animation_result.get('animation_data', {})),
+                    duration=duration,
+                    category=animation_result.get('category', '其他'),
+                    user_id=user_id
+                )
+                db.session.add(animation)
+                
+                # 更新任务状态
+                t = GenerationTask.query.get(task_id)
+                if t:
+                    t.status = 'completed'
+                    t.result = json.dumps(animation_result)
+                    t.completed_at = datetime.utcnow()
+                
+                # 扣减配额
+                u = User.query.get(user_id)
+                if u:
+                    u.quota -= 1
+                
+                db.session.commit()
+                
+                yield f"data: {json.dumps({'type': 'complete', 'animation': animation.to_dict(include_content=True), 'remaining_quota': u.quota if u else 0})}\n\n"
+            except Exception as e:
+                db.session.rollback()
+                yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+    
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'
+        }
+    )
 
 @animations_bp.route('/generate', methods=['POST'])
 @jwt_required()

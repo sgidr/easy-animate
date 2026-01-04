@@ -17,6 +17,9 @@ function Create() {
   const baseAnimation = location.state?.baseAnimation || null
   const [prompt, setPrompt] = useState(location.state?.prompt || '')
   const [generating, setGenerating] = useState(false)
+  const [generateProgress, setGenerateProgress] = useState(0)
+  const [generateTokens, setGenerateTokens] = useState(0)
+  const [generateMessage, setGenerateMessage] = useState('')
   const [animation, setAnimation] = useState(baseAnimation)
   const [history, setHistory] = useState([])
   const [isPlaying, setIsPlaying] = useState(true)
@@ -52,18 +55,88 @@ function Create() {
   const handleGenerate = async () => {
     if (!prompt.trim()) return
     if (user?.quota <= 0) { error('生成次数已用完，请联系管理员'); return }
+    
     setGenerating(true)
+    setGenerateProgress(0)
+    setGenerateTokens(0)
+    setGenerateMessage('初始化...')
+    
     try {
       const requestData = { 
         prompt: animation ? `基于以下动画进行修改，生成一个新的动画：\n原动画标题：${animation.title}\n原动画描述：${animation.description}\n\n修改要求：${prompt}` : prompt,
         params: { bgColor: bgColor === 'transparent' ? 'transparent' : bgColor }
       }
-      const res = await api.post('/animations/generate', requestData)
-      setAnimation(res.data.animation); setPrompt(''); setPlayTime(0)
-      success(animation ? '新动画已生成' : '动画生成成功')
-      fetchUser(); fetchHistory()
-    } catch (err) { error(err.response?.data?.error || '生成失败') }
-    finally { setGenerating(false) }
+      
+      const authStorage = localStorage.getItem('auth-storage')
+      let token = ''
+      if (authStorage) {
+        try {
+          const parsed = JSON.parse(authStorage)
+          token = parsed?.state?.token || ''
+        } catch (e) {
+          console.error('Failed to parse auth storage:', e)
+        }
+      }
+      const baseUrl = import.meta.env.VITE_BACKEND_URL || ''
+      
+      const response = await fetch(`${baseUrl}/api/animations/generate-stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(requestData)
+      })
+      
+      if (!response.ok) {
+        const errData = await response.json()
+        throw new Error(errData.error || '生成失败')
+      }
+      
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        
+        const text = decoder.decode(value)
+        const lines = text.split('\n')
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              if (data.type === 'progress') {
+                setGenerateProgress(data.progress || 0)
+                setGenerateTokens(data.tokens || 0)
+                setGenerateMessage(data.message || '生成中...')
+              } else if (data.type === 'complete') {
+                setAnimation(data.animation)
+                setPrompt('')
+                setPlayTime(0)
+                success(animation ? '新动画已生成' : '动画生成成功')
+                fetchUser()
+                fetchHistory()
+              } else if (data.type === 'error') {
+                throw new Error(data.message)
+              }
+            } catch (e) {
+              if (e.message !== 'Unexpected end of JSON input') {
+                console.error('Parse error:', e)
+              }
+            }
+          }
+        }
+      }
+    } catch (err) { 
+      error(err.message || '生成失败') 
+    } finally { 
+      setGenerating(false)
+      setGenerateProgress(0)
+      setGenerateTokens(0)
+      setGenerateMessage('')
+    }
   }
 
   const handlePublish = async () => {
@@ -264,6 +337,17 @@ function Create() {
               </div>
               <div className="relative">
                 <div ref={svgRef} className="aspect-video bg-dark-200 flex items-center justify-center p-2 sm:p-4" dangerouslySetInnerHTML={{ __html: animation?.svg_content || '<svg viewBox="0 0 800 600"><text x="400" y="300" text-anchor="middle" fill="#666">预览区域</text></svg>' }} />
+                {generating && (
+                  <div className="absolute inset-0 bg-dark/80 flex flex-col items-center justify-center gap-3">
+                    <div className="w-3/4 max-w-xs bg-dark-400 rounded-full h-3 overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300" style={{ width: `${generateProgress}%` }} />
+                    </div>
+                    <div className="text-sm text-white text-center">
+                      <div>{generateMessage || '生成中...'} {generateProgress}%</div>
+                      {generateTokens > 0 && <div className="text-xs text-slate-400 mt-1">{generateTokens} tokens</div>}
+                    </div>
+                  </div>
+                )}
                 {exporting && (
                   <div className="absolute inset-0 bg-dark/80 flex flex-col items-center justify-center gap-3">
                     <div className="w-3/4 max-w-xs bg-dark-400 rounded-full h-3 overflow-hidden">
@@ -339,9 +423,20 @@ function Create() {
                   </button>
                   <button onClick={handleGenerate} disabled={generating || !prompt.trim()}
                     className="flex-1 py-2.5 sm:py-3 bg-gradient-to-r from-primary to-accent rounded-xl flex items-center justify-center gap-1 sm:gap-2 disabled:opacity-50 btn-glow text-xs sm:text-sm">
-                    <Sparkles className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />{generating ? '生成中...' : (animation ? '修改' : '生成')}
+                    <Sparkles className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />{generating ? `${generateProgress}%` : (animation ? '修改' : '生成')}
                   </button>
                 </div>
+                {generating && (
+                  <div className="mt-3 space-y-2">
+                    <div className="w-full bg-dark-300 rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-300" style={{ width: `${generateProgress}%` }} />
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>{generateMessage}</span>
+                      <span>{generateTokens > 0 ? `${generateTokens} tokens` : ''}</span>
+                    </div>
+                  </div>
+                )}
                 <p className="text-center text-xs sm:text-sm text-slate-500 mt-3 sm:mt-4">
                   遇到问题？<button onClick={() => setShowContactModal(true)} className="text-accent hover:underline ml-1">联系作者</button>
                 </p>

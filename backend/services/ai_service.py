@@ -3,6 +3,7 @@ import os
 import requests
 import logging
 from dotenv import load_dotenv
+from typing import Generator, Callable
 
 # 确保环境变量已加载
 load_dotenv()
@@ -421,5 +422,136 @@ JSON格式要求：
                 "params": params
             }
         }
+
+    def generate_animation_stream(self, prompt: str, duration: int = 30, params: dict = None) -> Generator:
+        """流式生成SVG动画，实时返回进度和token数"""
+        
+        # 验证配置
+        is_valid, error_msg = self._validate_config()
+        if not is_valid:
+            yield {"type": "error", "message": error_msg}
+            return
+        
+        # 获取当前模型
+        model = self._get_current_model()
+        
+        # 用户可调参数
+        params = params or {}
+        bg_color = params.get('bgColor', '#0f172a')
+        primary_color = params.get('primaryColor', '#6366f1')
+        accent_color = params.get('accentColor', '#22d3ee')
+        animation_speed = params.get('speed', 1.0)
+        
+        system_prompt = f"""你是一个专业的SVG动画生成助手。根据用户的描述，生成教学演示用的SVG动画。
+
+【重要】你必须返回一个有效的JSON对象，不要包含任何其他文字说明。
+
+JSON格式要求：
+{{
+    "title": "动画标题（简短）",
+    "description": "动画描述",
+    "category": "分类（物理/化学/生物/数学/地理/其他）",
+    "svg_content": "完整的SVG代码字符串",
+    "animation_data": {{}}
+}}
+
+【SVG动画核心要求】：
+1. 必须使用CSS @keyframes定义真实的动画效果
+2. 动画必须是连续循环的，使用 animation: name Xs infinite
+3. viewBox="0 0 800 600"
+4. 背景色: {bg_color}，主色调: {primary_color}，强调色: {accent_color}
+5. 动画时长约{duration}秒，速度系数{animation_speed}
+
+请确保SVG代码完整、有效，动画流畅自然。"""
+
+        try:
+            payload = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"请为以下主题生成一个{duration}秒的教学动画：\n\n{prompt}"}
+                ],
+                "temperature": 0.7,
+                "max_tokens": 8000,
+                "stream": True
+            }
+            
+            logger.info(f"📡 流式请求: {self.base_url}/chat/completions, 模型: {model}")
+            
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                headers=self._get_headers(),
+                json=payload,
+                timeout=240,
+                stream=True
+            )
+            
+            if response.status_code != 200:
+                error_text = response.text
+                logger.error(f"❌ API 错误: {response.status_code}")
+                yield {"type": "error", "message": f"API Error: {response.status_code} - {error_text}"}
+                return
+            
+            full_content = ""
+            total_tokens = 0
+            estimated_max_tokens = 6000  # 预估最大token数
+            
+            for line in response.iter_lines():
+                if line:
+                    line_text = line.decode('utf-8')
+                    if line_text.startswith('data: '):
+                        data_str = line_text[6:]
+                        if data_str == '[DONE]':
+                            break
+                        try:
+                            data = json.loads(data_str)
+                            if 'choices' in data and len(data['choices']) > 0:
+                                delta = data['choices'][0].get('delta', {})
+                                content = delta.get('content', '')
+                                if content:
+                                    full_content += content
+                                    # 估算token数（粗略：1个字符约0.5-1个token）
+                                    total_tokens = len(full_content) // 2
+                                    # 计算进度百分比
+                                    progress = min(95, int((total_tokens / estimated_max_tokens) * 100))
+                                    
+                                    yield {
+                                        "type": "progress",
+                                        "progress": progress,
+                                        "tokens": total_tokens,
+                                        "message": "生成中..."
+                                    }
+                        except json.JSONDecodeError:
+                            continue
+            
+            # 解析完整内容
+            yield {"type": "progress", "progress": 98, "tokens": total_tokens, "message": "解析结果..."}
+            
+            try:
+                result = json.loads(full_content)
+            except json.JSONDecodeError:
+                import re
+                json_match = re.search(r'\{.*\}', full_content, re.DOTALL)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group())
+                    except:
+                        result = self._generate_default_animation(prompt, duration, params)
+                else:
+                    result = self._generate_default_animation(prompt, duration, params)
+            
+            yield {
+                "type": "complete",
+                "data": result,
+                "tokens": total_tokens
+            }
+            
+        except requests.exceptions.Timeout:
+            yield {"type": "error", "message": "请求超时"}
+        except requests.exceptions.ConnectionError as e:
+            yield {"type": "error", "message": f"连接失败: {str(e)}"}
+        except Exception as e:
+            logger.error(f"❌ 流式生成错误: {str(e)}")
+            yield {"type": "error", "message": f"生成失败: {str(e)}"}
 
 ai_service = AIService()

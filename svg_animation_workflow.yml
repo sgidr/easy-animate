@@ -1,0 +1,278 @@
+flowMeta:
+  name: SVG动画生成工作流
+  description: '根据用户描述生成SVG动画代码'
+  avatarIcon: https://oss-beijing-m8.openstorage.cn/SparkBotProd/icon/explore/emojiitem_03_6@2x.png
+  avatarColor: '#E5D5FF'
+  advancedConfig: '{"prologue":{"enabled":true,"inputExample":["生成一个跳动的红色爱心动画","创建一个旋转的地球动画","画一个闪烁的星星动画"]},"textToSpeech":{"enabled":false},"needGuide":false}'
+  dslVersion: v1
+flowData:
+  nodes:
+    - id: node-start::a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      dragging: false
+      selected: false
+      width: 362
+      height: 74
+      position:
+        x: -200
+        y: 400
+      positionAbsolute:
+        x: -200
+        y: 400
+      type: 开始节点
+      data:
+        allowInputReference: false
+        allowOutputReference: true
+        label: 开始
+        status: ''
+        nodeMeta:
+          aliasName: 开始节点
+          nodeType: 基础节点
+        inputs: []
+        outputs:
+          - id: output-start::b2c3d4e5-f6a7-8901-bcde-f23456789012
+            name: AGENT_USER_INPUT
+            schema:
+              type: string
+            default: 用户本轮对话输入内容
+            required: true
+            deleteDisabled: true
+        nodeParam: {}
+        icon: https://oss-beijing-m8.openstorage.cn/pro-bucket/sparkBot/common/workflow/icon/start-node-icon.png
+        description: 工作流的开启节点，用于定义流程调用所需的业务变量信息。
+        updatable: false
+
+    - id: node-end::c3d4e5f6-a7b8-9012-cdef-345678901234
+      dragging: false
+      selected: false
+      width: 362
+      height: 74
+      position:
+        x: 1200
+        y: 400
+      positionAbsolute:
+        x: 1200
+        y: 400
+      type: 结束节点
+      data:
+        allowInputReference: true
+        allowOutputReference: false
+        label: 结束
+        references: []
+        status: ''
+        nodeMeta:
+          aliasName: 结束节点
+          nodeType: 基础节点
+        inputs:
+          - id: input-end::d4e5f6a7-b8c9-0123-def0-456789012345
+            name: output
+            schema:
+              type: string
+            value:
+              type: ref
+              content:
+                name: output
+                id: output-code::f6a7b8c9-d0e1-2345-f012-678901234567
+                nodeId: ifly-code::e5f6a7b8-c9d0-1234-ef01-567890123456
+        outputs: []
+        nodeParam:
+          template: ''
+          streamOutput: true
+          outputMode: 1
+        icon: https://oss-beijing-m8.openstorage.cn/pro-bucket/sparkBot/common/workflow/icon/end-node-icon.png
+        description: 工作流的结束节点，用于输出工作流运行后的最终结果。
+        updatable: false
+
+    - id: spark-llm::d4e5f6a7-b8c9-0123-def0-456789012345
+      dragging: false
+      selected: false
+      width: 362
+      height: 124
+      position:
+        x: 250
+        y: 400
+      positionAbsolute:
+        x: 250
+        y: 400
+      type: 大模型
+      data:
+        allowInputReference: true
+        allowOutputReference: true
+        label: SVG生成模型
+        labelEdit: false
+        references: []
+        nodeMeta:
+          aliasName: 大模型
+          nodeType: 基础节点
+        inputs:
+          - id: input-llm::e5f6a7b8-c9d0-1234-ef01-567890123456
+            name: input
+            nameErrMsg: ''
+            schema:
+              type: string
+            value:
+              type: ref
+              content:
+                name: AGENT_USER_INPUT
+                id: output-start::b2c3d4e5-f6a7-8901-bcde-f23456789012
+                nodeId: node-start::a1b2c3d4-e5f6-7890-abcd-ef1234567890
+            contentErrMsg: ''
+            fileType: ''
+        outputs:
+          - id: output-llm::f6a7b8c9-d0e1-2345-f012-678901234567
+            name: output
+            nameErrMsg: ''
+            schema:
+              type: string
+            default: ''
+        nodeParam:
+          topK: 4
+          template: '{{input}}'
+          enableChatHistoryV2:
+            isEnabled: false
+            rounds: 1
+          auditing: default
+          llmId: 110
+          url: wss://spark-api.xf-yun.com/v4.0/chat
+          uid: ''
+          patchId: '0'
+          templateErrMsg: ''
+          domain: 4.0Ultra
+          appId: ''
+          maxTokens: 4096
+          temperature: 0.7
+          systemTemplate: |
+            你是一个专业的SVG动画设计师。根据用户的描述，生成一个完整的SVG动画代码。
+
+            要求：
+            1. 生成的SVG必须是完整的，包含<svg>标签
+            2. SVG的viewBox应该是"0 0 800 600"
+            3. 必须包含CSS动画或SMIL动画，让图形动起来
+            4. 动画应该是无限循环的
+            5. 代码要简洁、优雅
+            6. 只输出SVG代码，不要有任何解释文字
+            7. 背景使用 fill="#1e293b" 的矩形作为默认背景
+
+            示例输出格式：
+            <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+              <style>
+                /* CSS动画定义 */
+              </style>
+              <rect width="800" height="600" fill="#1e293b"/>
+              <!-- 动画元素 -->
+            </svg>
+          model: spark
+          serviceId: bm4
+          respFormat: 0
+          llmIdErrMsg: ''
+        icon: https://oss-beijing-m8.openstorage.cn/pro-bucket/sparkBot/common/workflow/icon/largeModelIcon.png
+        description: 根据用户描述生成SVG动画代码
+        updatable: false
+
+    - id: ifly-code::e5f6a7b8-c9d0-1234-ef01-567890123456
+      dragging: false
+      selected: false
+      width: 362
+      height: 100
+      position:
+        x: 700
+        y: 400
+      positionAbsolute:
+        x: 700
+        y: 400
+      type: 代码
+      data:
+        allowInputReference: true
+        allowOutputReference: true
+        label: SVG代码提取
+        labelEdit: false
+        references: []
+        nodeMeta:
+          aliasName: 代码
+          nodeType: 工具
+        inputs:
+          - id: input-code::a7b8c9d0-e1f2-3456-0123-789012345678
+            name: input
+            nameErrMsg: ''
+            schema:
+              type: string
+            value:
+              type: ref
+              content:
+                name: output
+                id: output-llm::f6a7b8c9-d0e1-2345-f012-678901234567
+                nodeId: spark-llm::d4e5f6a7-b8c9-0123-def0-456789012345
+            contentErrMsg: ''
+        outputs:
+          - id: output-code::f6a7b8c9-d0e1-2345-f012-678901234567
+            name: output
+            nameErrMsg: ''
+            schema:
+              type: string
+            default: ''
+        nodeParam:
+          uid: ''
+          code: |
+            # -*- coding: utf-8 -*-
+            import re
+
+            def main(input):
+                """
+                从大模型输出中提取SVG代码
+                如果输出包含markdown代码块，则提取其中的SVG
+                否则直接返回原始输出
+                """
+                svg_content = input
+                
+                # 尝试从markdown代码块中提取SVG
+                code_block_pattern = r'```(?:svg|xml|html)?\s*([\s\S]*?)```'
+                matches = re.findall(code_block_pattern, input)
+                
+                if matches:
+                    # 取第一个代码块
+                    svg_content = matches[0].strip()
+                
+                # 确保以<svg开头
+                svg_match = re.search(r'(<svg[\s\S]*</svg>)', svg_content, re.IGNORECASE)
+                if svg_match:
+                    svg_content = svg_match.group(1)
+                
+                ret = {
+                    "output": svg_content
+                }
+                return ret
+          appId: ''
+          codeErrMsg: ''
+        icon: https://oss-beijing-m8.openstorage.cn/pro-bucket/sparkBot/common/workflow/icon/codeIcon.png
+        description: 从大模型输出中提取纯净的SVG代码
+        updatable: false
+
+  edges:
+    - source: node-start::a1b2c3d4-e5f6-7890-abcd-ef1234567890
+      target: spark-llm::d4e5f6a7-b8c9-0123-def0-456789012345
+      type: customEdge
+      id: reactflow__edge-node-start::a1b2c3d4-e5f6-7890-abcd-ef1234567890-spark-llm::d4e5f6a7-b8c9-0123-def0-456789012345
+      markerEnd:
+        color: '#6356EA'
+        type: arrow
+      data:
+        edgeType: curve
+
+    - source: spark-llm::d4e5f6a7-b8c9-0123-def0-456789012345
+      target: ifly-code::e5f6a7b8-c9d0-1234-ef01-567890123456
+      type: customEdge
+      id: reactflow__edge-spark-llm::d4e5f6a7-b8c9-0123-def0-456789012345-ifly-code::e5f6a7b8-c9d0-1234-ef01-567890123456
+      markerEnd:
+        color: '#6356EA'
+        type: arrow
+      data:
+        edgeType: curve
+
+    - source: ifly-code::e5f6a7b8-c9d0-1234-ef01-567890123456
+      target: node-end::c3d4e5f6-a7b8-9012-cdef-345678901234
+      type: customEdge
+      id: reactflow__edge-ifly-code::e5f6a7b8-c9d0-1234-ef01-567890123456-node-end::c3d4e5f6-a7b8-9012-cdef-345678901234
+      markerEnd:
+        color: '#6356EA'
+        type: arrow
+      data:
+        edgeType: curve
