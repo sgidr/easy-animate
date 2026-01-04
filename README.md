@@ -16,11 +16,13 @@
 - **前端**: React + Vite + TailwindCSS
 - **后端**: Flask + SQLAlchemy
 - **数据库**: SQLite
-- **AI**: Claude Haiku (yunwu.ai)
+- **AI**: Gemini 3 Pro/Gemini 3 Flash/Claude Haiku (yunwu.ai)
 
 ## 快速开始
 
 ### 1. 后端启动
+
+**运行环境**：Python 3.12.4，Node.js v22.16.0
 
 ```bash
 cd backend
@@ -28,14 +30,10 @@ cd backend
 # 创建虚拟环境
 python -m venv venv
 venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
+source venv/bin/activate  # Linux/Mac
 
 # 安装依赖
 pip install -r requirements.txt
-
-# 配置环境变量
-copy .env.example .env
-# 编辑 .env 文件，填入你的 Claude API Key
 
 # 启动服务
 python app.py
@@ -90,36 +88,9 @@ npm run dev
 
 ## 环境变量
 
-在 `backend/.env` 中配置:
 
-```
-SECRET_KEY=your-secret-key
-JWT_SECRET_KEY=your-jwt-secret
-CLAUDE_API_KEY=your-claude-api-key
-CLAUDE_API_BASE_URL=https://yunwu.ai/v1
-CLAUDE_MODEL=claude-haiku-4-5-20251001
-```
-
-### API 配置说明
+### .env 中 API 配置说明
 
 - **CLAUDE_API_KEY**: 从 yunwu.ai 获取的 API 密钥
 - **CLAUDE_API_BASE_URL**: Claude API 的基础 URL（默认为 yunwu.ai）
 - **CLAUDE_MODEL**: 使用的模型名称（默认为 claude-haiku-4-5-20251001）
-
-## 部署
-
-### 生产环境构建
-
-```bash
-# 前端构建
-cd frontend
-npm run build
-
-# 后端使用gunicorn
-cd backend
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
-```
-
-## License
-
-MIT
